@@ -1,0 +1,35 @@
+{
+  "name": "tawa-taste-customer-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "prebuild": "npm run contract:emit",
+    "start": "next start",
+    "lint": "eslint .",
+    "contract": "prisma contract emit",
+    "contract:emit": "prisma contract emit",
+    "db:seed": "node scripts/seed.mjs",
+    "postinstall": "prisma skills sync || exit 0"
+  },
+  "dependencies": {
+    "@prisma/orm-postgres": "8.0.0-rc.11",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^18.0.0",
+    "html2canvas-pro": "^2.4.3",
+    "jspdf": "^4.2.1",
+    "lucide-react": "^1.42.0",
+    "next": "16.4.3",
+    "prisma": "^8.0.0-rc.15",
+    "react": "latest",
+    "react-dom": "latest",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "latest",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.4",
+    "tailwindcss": "latest"
+  }
+}

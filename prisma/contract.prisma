@@ -1,0 +1,360 @@
+// use prisma-8
+
+enum UserRoleName {
+	@@type("pg/text@1")
+
+	ADMIN = "ADMIN"
+	WAITER = "WAITER"
+	CHEF = "CHEF"
+	CUSTOMER = "CUSTOMER"
+}
+
+enum ApprovalStatus {
+	@@type("pg/text@1")
+
+	PENDING = "PENDING"
+	APPROVED = "APPROVED"
+	REJECTED = "REJECTED"
+}
+
+enum AccountStatus {
+	@@type("pg/text@1")
+
+	ACTIVE = "ACTIVE"
+	SUSPENDED = "SUSPENDED"
+	DISABLED = "DISABLED"
+}
+
+enum RestaurantTableStatus {
+	@@type("pg/text@1")
+
+	AVAILABLE = "AVAILABLE"
+	MAINTENANCE = "MAINTENANCE"
+	INACTIVE = "INACTIVE"
+}
+
+enum ReservationStatus {
+	@@type("pg/text@1")
+
+	PENDING = "PENDING"
+	CONFIRMED = "CONFIRMED"
+	CANCELLED = "CANCELLED"
+	COMPLETED = "COMPLETED"
+	NO_SHOW = "NO_SHOW"
+}
+
+enum OrderStatus {
+	@@type("pg/text@1")
+
+	PLACED = "PLACED"
+	IN_KITCHEN = "IN_KITCHEN"
+	READY = "READY"
+	SERVED = "SERVED"
+	PAID = "PAID"
+	CANCELLED = "CANCELLED"
+}
+
+enum BillStatus {
+	@@type("pg/text@1")
+
+	UNPAID = "UNPAID"
+	PARTIALLY_PAID = "PARTIALLY_PAID"
+	PAID = "PAID"
+	VOID = "VOID"
+}
+
+enum PaymentMethod {
+	@@type("pg/text@1")
+
+	CASH = "CASH"
+	CARD = "CARD"
+	ONLINE = "ONLINE"
+	OTHER = "OTHER"
+}
+
+enum PaymentStatus {
+	@@type("pg/text@1")
+
+	PENDING = "PENDING"
+	COMPLETED = "COMPLETED"
+	FAILED = "FAILED"
+	REFUNDED = "REFUNDED"
+}
+
+model User {
+	id              String         @id @default(uuid())
+	fullName        String
+	email           String         @unique
+	phone           String?
+	passwordHash    String
+	approvalStatus  ApprovalStatus @default(PENDING)
+	accountStatus   AccountStatus  @default(ACTIVE)
+	createdAt       TimestamptzString(3) @default(now())
+	updatedAt       TimestamptzString(3) @default(now())
+
+	roles               UserRole[]
+	sessions            AuthSession[]
+	reservations        Reservation[]
+	orders              Order[]
+
+	@@index([approvalStatus, accountStatus])
+}
+
+model Role {
+	id          String        @id @default(uuid())
+	name        UserRoleName  @unique
+	createdAt   TimestamptzString(3) @default(now())
+
+	users       UserRole[]
+}
+
+model UserRole {
+	userId      String
+	roleId      String
+	assignedAt  TimestamptzString(3) @default(now())
+
+	user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+	role        Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+	@@id([userId, roleId])
+	@@index([roleId])
+}
+
+model AuthSession {
+	id                String             @id @default(uuid())
+	userId            String
+	sessionTokenHash  String             @unique
+	expiresAt         TimestamptzString(3)
+	createdAt         TimestamptzString(3) @default(now())
+	revokedAt         TimestamptzString(3)?
+
+	user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+	@@index([userId, expiresAt])
+}
+
+model Category {
+	id           String       @id @default(uuid())
+	name         String       @unique
+	slug         String       @unique
+	displayOrder Int          @default(0)
+	isActive     Boolean      @default(true)
+	createdAt    TimestamptzString(3) @default(now())
+	updatedAt    TimestamptzString(3) @default(now())
+
+	menuItems MenuItem[]
+}
+
+model MenuItem {
+	id                    String       @id @default(uuid())
+	slug                  String       @unique
+	name                  String
+	description           String
+	price                 Decimal
+	imageUrl              String
+	isAvailable           Boolean      @default(true)
+	isBuildable           Boolean      @default(false)
+	preparationTimeMin    Int
+	preparationTimeMax    Int
+	categoryId            String
+	createdAt             TimestamptzString(3) @default(now())
+	updatedAt             TimestamptzString(3) @default(now())
+
+	category              Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+	ingredients           MenuItemIngredient[]
+	customizationGroups  MenuItemCustomizationGroup[]
+	orderItems            OrderItem[]
+
+	@@index([categoryId, isAvailable])
+	@@index([isBuildable, isAvailable])
+}
+
+model Ingredient {
+	id        String       @id @default(uuid())
+	name      String       @unique
+	createdAt TimestamptzString(3) @default(now())
+
+	menuItems MenuItemIngredient[]
+}
+
+model MenuItemIngredient {
+	menuItemId  String
+	ingredientId String
+	displayOrder Int @default(0)
+
+	menuItem   MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+	ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+
+	@@id([menuItemId, ingredientId])
+	@@index([ingredientId])
+}
+
+model CustomizationGroup {
+	id           String       @id @default(uuid())
+	name         String       @unique
+	displayOrder Int          @default(0)
+
+	options   CustomizationOption[]
+	menuItems MenuItemCustomizationGroup[]
+}
+
+model CustomizationOption {
+	id           String       @id @default(uuid())
+	groupId      String
+	name         String
+	priceDelta   Decimal      @default("0")
+	isAvailable  Boolean      @default(true)
+	displayOrder Int          @default(0)
+
+	group       CustomizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+	orderItems  OrderItemCustomization[]
+
+	@@unique([groupId, name])
+	@@index([groupId, isAvailable])
+}
+
+model MenuItemCustomizationGroup {
+	menuItemId       String
+	groupId          String
+	isRequired       Boolean @default(false)
+	minimumSelections Int    @default(0)
+	maximumSelections Int    @default(1)
+
+	menuItem MenuItem          @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+	group    CustomizationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+	@@id([menuItemId, groupId])
+	@@index([groupId])
+}
+
+model TableZone {
+	id        String       @id @default(uuid())
+	name      String       @unique
+	createdAt TimestamptzString(3) @default(now())
+
+	tables RestaurantTable[]
+}
+
+model RestaurantTable {
+	id              String                 @id @default(uuid())
+	tableNumber     String                 @unique
+	seatingCapacity Int
+	zoneId          String
+	status          RestaurantTableStatus  @default(AVAILABLE)
+	createdAt       TimestamptzString(3) @default(now())
+	updatedAt       TimestamptzString(3) @default(now())
+
+	zone          TableZone     @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+	reservations  Reservation[]
+	orders        Order[]
+
+	@@index([zoneId, status])
+}
+
+model Reservation {
+	id              String            @id @default(uuid())
+	customerId      String
+	tableId         String
+	reservationDate DateString
+	startTime       TimeString(0)
+	endTime         TimeString(0)
+	guestCount      Int
+	status          ReservationStatus @default(PENDING)
+	createdAt       TimestamptzString(3) @default(now())
+	updatedAt       TimestamptzString(3) @default(now())
+	cancelledAt     TimestamptzString(3)?
+
+	customer User             @relation(fields: [customerId], references: [id], onDelete: Restrict)
+	table    RestaurantTable  @relation(fields: [tableId], references: [id], onDelete: Restrict)
+
+	@@index([customerId, reservationDate])
+	@@index([tableId, reservationDate, startTime, endTime], name: "reservation_table_time")
+	@@index([reservationDate, status])
+}
+
+model Order {
+	id          String      @id @default(uuid())
+	orderNumber String      @unique
+	customerId  String?
+	tableId     String?
+	placedAt    TimestamptzString(3) @default(now())
+	status      OrderStatus @default(PLACED)
+	etaMinutes  Int?
+	subtotal    Decimal
+	taxRate     Decimal
+	taxAmount   Decimal
+	total       Decimal
+	createdAt   TimestamptzString(3) @default(now())
+	updatedAt   TimestamptzString(3) @default(now())
+
+	customer User?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+	table    RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+	items    OrderItem[]
+	bill     Bill?
+
+	@@index([customerId, createdAt])
+	@@index([status, createdAt])
+	@@index([tableId, createdAt])
+}
+
+model OrderItem {
+	id              String  @id @default(uuid())
+	orderId         String
+	menuItemId      String?
+	itemNameSnapshot String
+	quantity        Int
+	unitPrice       Decimal
+	subtotal        Decimal
+	createdAt       TimestamptzString(3) @default(now())
+
+	order          Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+	menuItem       MenuItem?   @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+	customizations OrderItemCustomization[]
+
+	@@index([orderId])
+	@@index([menuItemId])
+}
+
+model OrderItemCustomization {
+	orderItemId          String
+	optionId             String
+	optionNameSnapshot   String
+	priceDeltaSnapshot   Decimal
+
+	orderItem OrderItem           @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+	option    CustomizationOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+
+	@@id([orderItemId, optionId])
+	@@index([optionId])
+}
+
+model Bill {
+	id        String     @id @default(uuid())
+	orderId   String     @unique
+	subtotal  Decimal
+	taxRate   Decimal
+	taxAmount Decimal
+	total     Decimal
+	status    BillStatus @default(UNPAID)
+	issuedAt  TimestamptzString(3) @default(now())
+	paidAt    TimestamptzString(3)?
+
+	order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+	payments Payment[]
+}
+
+model Payment {
+	id                    String        @id @default(uuid())
+	billId                String
+	amount                Decimal
+	method                PaymentMethod
+	status                PaymentStatus @default(PENDING)
+	paidAt                TimestamptzString(3)?
+	transactionReference  String?       @unique
+	createdAt             TimestamptzString(3) @default(now())
+	updatedAt             TimestamptzString(3) @default(now())
+
+	bill Bill @relation(fields: [billId], references: [id], onDelete: Restrict)
+
+	@@index([billId, status])
+}
