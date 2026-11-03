@@ -4,6 +4,10 @@ Tawa & Taste is a restaurant management and customer ordering system created as 
 
 > **Academic project:** This application is for learning and demonstration. It is not a commercial production system, and its payment flow does not process real money.
 
+## 🌐 Live Preview
+
+Check out the live demo: [Restaurant Management System](https://restaurant-management-system-custom-eight.vercel.app/guest)
+
 ## Features
 
 - Customer signup, login, logout, bcrypt password hashing, and database-backed sessions
@@ -15,15 +19,6 @@ Tawa & Taste is a restaurant management and customer ordering system created as 
 - Simulated online payment completion for demonstration purposes
 - PostgreSQL persistence with Prisma 8 contracts and migrations
 - Responsive interface built with Tailwind CSS
-
-## Screenshots
-
-Screenshots can be added here for portfolio presentation:
-
-1. Menu and category browsing
-2. Item customization and cart
-3. Table reservation
-4. Orders and receipt
 
 ## Technology stack
 
@@ -67,12 +62,13 @@ Create a PostgreSQL database for the project, then copy the environment template
 cp .env.example .env.local
 ```
 
-Update `DATABASE_URL` in `.env.local` with your local PostgreSQL connection string. Keep `.env`, `.env.local`, passwords, and other secret-bearing files out of GitHub.
+Update `DATABASE_URL` and `DIRECT_URL` in `.env.local` with your PostgreSQL connection strings. `DATABASE_URL` is used by the application at runtime, while `DIRECT_URL` is used by Prisma migration commands. They may use the same value for a local database. Keep `.env`, `.env.local`, passwords, and other secret-bearing files out of GitHub.
 
 Example:
 
 ```env
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/tawa_taste"
+DATABASE_URL="postgresql://postgres:password@localhost:5432/tawa_taste"
+DIRECT_URL="postgresql://postgres:password@localhost:5432/tawa_taste"
 ```
 
 ## Prisma and database setup
@@ -85,7 +81,16 @@ Emit the contract:
 npm run contract
 ```
 
-Apply the checked-in migrations to your configured database using the Prisma 8 migration workflow appropriate for your environment. Seed the sample restaurant data:
+Apply the checked-in migrations to your configured database:
+
+```bash
+set -a
+. ./.env.local
+set +a
+npx prisma db migrate --db "$DIRECT_URL"
+```
+
+Then seed the sample restaurant data:
 
 ```bash
 npm run db:seed
